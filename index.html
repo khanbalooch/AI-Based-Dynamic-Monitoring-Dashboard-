@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI-First Monitoring Dashboard • Dynamic ECharts</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <style>
+    :root { --bg:#0b1020; --panel:#111731; --muted:#8ea0c0; --text:#e9eefb; --accent:#4f7cff; --grid-gap:16px; }
+    *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji"}
+    .topbar{position:sticky;top:0;z-index:10;backdrop-filter:blur(6px);background:linear-gradient(180deg,rgba(17,23,49,0.9),rgba(17,23,49,0.6));border-bottom:1px solid rgba(255,255,255,0.06)}
+    .container{max-width:1200px;margin:0 auto;padding:16px}
+    .prompt{display:grid;grid-template-columns:1fr auto auto auto auto;gap:8px;align-items:center}
+    .prompt input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:#0e152d;color:var(--text)}
+    .btn{padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:#0f1731;color:var(--text);cursor:pointer;transition:120ms ease}
+    .btn:hover{transform:translateY(-1px);border-color:rgba(79,124,255,0.35)} .btn.primary{background:linear-gradient(180deg,#4f7cff,#3c5fe0);border:none} .btn.ghost{background:transparent}
+    .btn.badge{position:relative} .btn.badge .count{position:absolute;top:-6px;right:-6px;background:#ff6b6b;color:white;font-size:10px;padding:2px 6px;border-radius:999px}
+    .status{color:var(--muted);font-size:12px;margin-top:8px;min-height:18px}
+    .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--grid-gap);padding:16px}
+    .card{background:var(--panel);border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:260px}
+    .card-header{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.06)} .card-title{font-weight:600}
+    .card-sub{color:var(--muted);font-size:12px;margin-top:2px}
+    .chart{height:280px}
+    .card-footer{padding:10px 14px;border-top:1px solid rgba(255,255,255,0.06);color:var(--muted);font-size:12px}
+    .empty{margin:48px auto;text-align:center;color:var(--muted)} .empty h2{color:var(--text);font-weight:600}
+    .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:90vw;background:#0f1630;border-left:1px solid rgba(255,255,255,0.08);transform:translateX(100%);transition:transform 160ms ease-out;z-index:20;display:flex;flex-direction:column}
+    .drawer.open{transform:translateX(0)} .drawer-header{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between}
+    .drawer-header h3{margin:0;font-size:16px;font-weight:600} .close-btn{background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer}
+    .drawer-search{padding:10px 12px;margin:12px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:#0c1330;color:var(--text);width:calc(100% - 32px)}
+    .group{padding:10px 16px 4px;color:#b9c7e9;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+    .list{padding:0 8px 12px 8px;overflow:auto}
+    .item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start;padding:8px;margin:4px 8px;border:1px solid rgba(255,255,255,0.06);border-radius:10px;background:#111937}
+    .chip{font-family:ui-monospace,monospace;background:#0c1533;color:#c4d0f7;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.08)}
+    .desc{color:var(--muted);font-size:12px}
+    .item button{border:1px solid rgba(255,255,255,0.08);background:#142148;color:var(--text);border-radius:8px;padding:6px 8px;cursor:pointer}
+    .item button:hover{border-color:rgba(79,124,255,0.35)} .drawer-footer{margin-top:auto;padding:10px 16px;border-top:1px solid rgba(255,255,255,0.08);color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="container">
+    <form class="prompt" id="promptForm" autocomplete="off">
+      <input id="query" name="query" placeholder="Ask anything… e.g., error rate by channel_id last week" />
+      <button class="btn primary" id="askBtn" type="submit">Ask ↵</button>
+      <button class="btn" type="button" id="demoBtn" title="Use sample data">Sample</button>
+      <button class="btn badge" type="button" id="dimsBtn" title="Browse dimensions">Dimensions <span class="count" id="dimsCount">0</span></button>
+      <button class="btn ghost" type="button" id="clearBtn">Clear</button>
+    </form>
+    <div class="status" id="status">Ready.</div>
+  </div>
+</header>
+
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Available dimensions">
+  <div class="drawer-header">
+    <h3>Query Dimensions</h3>
+    <button class="close-btn" id="closeDrawer" aria-label="Close dimensions">×</button>
+  </div>
+  <input id="dimSearch" class="drawer-search" type="search" placeholder="Search dimension name or description…" />
+  <div id="dimList" class="list" role="list"></div>
+  <div class="drawer-footer">Pro tip: Shift‑click <em>Insert</em> to append a colon (e.g., <code>status:timeout</code>).</div>
+</aside>
+
+<main class="container">
+  <section id="dashboard" class="dashboard" aria-live="polite" aria-busy="false"></section>
+  <div id="emptyState" class="empty">
+    <h2>Ask a question to generate your dashboard</h2>
+    <p>Use the <strong>Dimensions</strong> panel to discover fields like <code>client_id</code>, <code>channel_id</code>, <code>status</code>, <code>e2e_latency_ms</code>, <code>total_tokens</code>, etc.</p>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script>
+  const $=(s,el=document)=>el.querySelector(s), $$=(s,el=document)=>[...el.querySelectorAll(s)];
+  const dashboardEl=$('#dashboard');
+  const emptyStateEl=$('#emptyState');
+  const statusEl=$('#status');
+  const drawerEl=$('#drawer');
+
+  const state={ charts:new Map() };
+  window.addEventListener('resize',()=>state.charts.forEach(c=>c.resize()));
+
+  // Drawer open/close
+  $('#dimsBtn').addEventListener('click',()=>{ drawerEl.classList.add('open'); drawerEl.setAttribute('aria-hidden','false'); $('#dimSearch').focus(); });
+  $('#closeDrawer').addEventListener('click',()=>{ drawerEl.classList.remove('open'); drawerEl.setAttribute('aria-hidden','true'); });
+
+  // Form actions
+  $('#promptForm').addEventListener('submit', async (e)=>{ e.preventDefault(); const q=$('#query').value.trim(); if(!q) return; await askBackend(q); });
+  $('#demoBtn').addEventListener('click',()=> renderDashboard(sampleResponse()));
+  $('#clearBtn').addEventListener('click',()=>{ clearDashboard(); status('Cleared.'); });
+
+  function status(msg){ statusEl.textContent=msg; }
+  function setBusy(b){ dashboardEl.setAttribute('aria-busy', b? 'true':'false'); }
+
+  // ----- Dimensions catalog (from your schema) -----
+  const DIM_SECTIONS=[
+    {name:'Core',items:[['id','UUID primary key.'],['received_at','Request arrival timestamp (UTC).']]},
+    {name:'Client context',items:[['urc','Idempotency/trace key (e.g., req_7f21e).'],['client_id','Logical end-user id (avoid PII).'],['user_agent','HTTP user-agent string.'],['user_ip','Client IP (INET).'],['channel_id','Channel/tenant label (web, whatsapp, slack, …).'],['financial_id','Billing/cost id (acct_XYZ, project_42).']]},
+    {name:'Request shape',items:[['request_format','chat.completions | chat.toolcalls | chat.structureOutput | embeddings | chat.visioncompletion'],['messages','OpenAI-style messages JSON.'],['prompt','Single string prompt.'],['attachments','Attachment metadata (JSONB).'],['parameters','Model parameters JSON.'],['stream','Whether response was streamed (boolean).']]},
+    {name:'Routing',items:[['selected_provider','Backend provider (triton, vllm, qwen, …).'],['selected_model_name','Model name (llama-3-70b, qwen2.5-vl, …).'],['route','rules | ab | canary | bandit | fallback']]},
+    {name:'Timing / Dispatch',items:[['dispatched_at','Final response dispatch timestamp.'],['status','ok | client_disconnect | timeout | server_error | cancelled'],['bytes_sent','Total bytes sent (BIGINT).'],['e2e_latency_ms','End-to-end latency (ms).']]},
+    {name:'Final attempt summary',items:[['finish_reason','stop | length | tool_call | content_filter | error'],['input_tokens','Final attempt input tokens.'],['output_tokens','Final attempt output tokens.'],['total_tokens','Final attempt total tokens.'],['output_text','Final text output (if stored).'],['output_json','Final structured output JSON.']]},
+    {name:'Provider HTTP/result',items:[['http_status','HTTP status from provider.'],['error_type','rate_limit | timeout | server_error | validation'],['error_message','Error details string.']]}];
+
+  $('#dimsCount').textContent = DIM_SECTIONS.reduce((n,g)=> n+g.items.length, 0);
+
+  const dimListEl = $('#dimList');
+  function buildDrawer(){
+    dimListEl.innerHTML='';
+    for(const group of DIM_SECTIONS){
+      const h=document.createElement('div'); h.className='group'; h.textContent=group.name; dimListEl.appendChild(h);
+      for(const [key,desc] of group.items){
+        const item=document.createElement('div'); item.className='item'; item.setAttribute('role','listitem');
+        item.innerHTML=`<span class="chip" title="${desc}">${key}</span><div class="desc">${desc}</div><div style="display:flex;gap:6px;"><button data-insert="${key}">Insert</button><button data-copy="${key}">Copy</button></div>`;
+        dimListEl.appendChild(item);
+      }
+    }
+  }
+  buildDrawer();
+
+  $('#dimSearch').addEventListener('input',(e)=>{
+    const q=e.target.value.toLowerCase();
+    $$('.item',dimListEl).forEach(it=>{
+      const key=$('.chip',it).textContent.toLowerCase();
+      const desc=$('.desc',it).textContent.toLowerCase();
+      it.style.display=(key.includes(q)||desc.includes(q))?'':'none';
+    });
+  });
+
+  dimListEl.addEventListener('click', async (e)=>{
+    const btn=e.target.closest('button'); if(!btn) return; const key=btn.dataset.insert||btn.dataset.copy; if(!key) return;
+    if(btn.dataset.insert){ const q=$('#query'); const withColon=e.shiftKey; q.value=(q.value? q.value+' ':'')+key+(withColon?':':''); q.focus(); }
+    else if(btn.dataset.copy){ await navigator.clipboard.writeText(key); btn.textContent='Copied'; setTimeout(()=>btn.textContent='Copy',800); }
+  });
+
+  // ----- Mock backend & chart rendering -----
+  async function askBackend(query){
+    try{
+      setBusy(true); status('Thinking… generating mock data for: '+query); await new Promise(r=>setTimeout(r,700));
+      const payload = sampleResponse(query);
+      renderDashboard(payload);
+      status('Rendered ' + (payload?.charts?.length || 0) + ' chart(s).');
+    }catch(err){ console.error(err); status('Failed: '+err.message); } finally { setBusy(false); }
+  }
+
+  function clearDashboard(){ state.charts.forEach(inst=>inst.dispose()); state.charts.clear(); dashboardEl.innerHTML=''; emptyStateEl.style.display='block'; }
+
+  function renderDashboard(spec){
+    clearDashboard();
+    if(!spec || !Array.isArray(spec.charts) || spec.charts.length===0){ status('No charts to render.'); return; }
+    emptyStateEl.style.display='none';
+
+    for(const chart of spec.charts){
+      const id=chart.id || `chart_${Math.random().toString(36).slice(2,8)}`;
+      const card=document.createElement('article'); card.className='card';
+      const header=document.createElement('div'); header.className='card-header'; header.innerHTML=`<div class="card-title">${chart.title||''}</div>${chart.subtitle?`<div class=card-sub>${chart.subtitle}</div>`:''}`;
+      const chartEl=document.createElement('div'); chartEl.id=id; chartEl.className='chart';
+      if(chart.height && chart.height>1) chartEl.style.height=(240*chart.height)+'px';
+      card.appendChild(header); card.appendChild(chartEl); if(chart.notes){ const f=document.createElement('div'); f.className='card-footer'; f.textContent=chart.notes; card.appendChild(f);} dashboardEl.appendChild(card);
+      const inst=echarts.init(chartEl,null,{renderer:'canvas'}); inst.setOption(buildOption(chart)); state.charts.set(id,inst);
+    }
+  }
+
+  function buildOption(chart){
+    const t=(chart.type||'line').toLowerCase(); const d=chart.data||{};
+    const common={ title:{show:false}, tooltip:{ trigger:(t==='pie'||t==='gauge')?'item':'axis' }, grid:{left:32,right:16,top:24,bottom:32}, toolbox:{feature:{saveAsImage:{}}} };
+    switch(t){
+      case 'bar': return { ...common, xAxis:{type:'category',data:d.x||[]}, yAxis:{type:'value'}, series:(d.series||[]).map(s=>({ name:s.name, type:'bar', data:s.data, emphasis:{focus:'series'} })) };
+      case 'pie': return { ...common, tooltip:{trigger:'item'}, series:[{ name:chart.title||'', type:'pie', radius:'60%', avoidLabelOverlap:true, data:d.items||[], label:{formatter:'{b}: {d}%'} }] };
+      case 'gauge': return { ...common, series:[{ type:'gauge', min:d.min??0, max:d.max??100, progress:{show:true}, detail:{valueAnimation:true,formatter:'{value}'}, data:[{value:d.value??0, name:chart.title||''}] }] };
+      case 'line':
+      default: return { ...common, xAxis:{type:'category',data:d.x||[]}, yAxis:{type:'value'}, series:(d.series||[]).map(s=>({ name:s.name, type:'line', data:s.data, smooth:!!s.smooth, areaStyle: s.area? {}: undefined })) };
+    }
+  }
+
+  // ----- Mock response generator (reacts to query keywords) -----
+  function sampleResponse(query=''){
+    const wantsTokens=/token|tokens/i.test(query);
+    const wantsLatency=/latency|ms|response/i.test(query);
+    const wantsStatus=/status|error|timeout|ok/i.test(query);
+
+    return {
+      charts:[
+        wantsLatency ? {
+          id:'latency', type:'line', title:'p95 e2e_latency_ms by hour', subtitle:'Last 24h',
+          data:{ x:Array.from({length:24},(_,i)=>i+':00'), series:[{ name:'e2e_latency_ms', data: randSeq(24,80,220), smooth:true, area:true }] },
+          notes:'Mock data'
+        } : {
+          id:'requests', type:'bar', title:'Requests by hour', subtitle:'Today',
+          data:{ x:Array.from({length:12},(_,i)=>(i*2)+':00'), series:[{ name:'requests', data: randSeq(12,200,1200) }] }
+        },
+        wantsTokens ? {
+          id:'tokens', type:'bar', title:'total_tokens by channel_id',
+          data:{ x:['web','slack','whatsapp','api'], series:[{ name:'total_tokens', data: randSeq(4,5000,45000) }] }
+        } : {
+          id:'channels', type:'pie', title:'Traffic by channel_id',
+          data:{ items:[{name:'web',value:435},{name:'slack',value:310},{name:'whatsapp',value:180},{name:'api',value:95}] }
+        },
+        wantsStatus ? {
+          id:'status', type:'pie', title:'status distribution',
+          data:{ items:[{name:'ok',value:820},{name:'timeout',value:45},{name:'server_error',value:22},{name:'cancelled',value:13}] }
+        } : {
+          id:'uptime', type:'gauge', title:'Uptime (mock)', data:{ value:+(98+Math.random()*2).toFixed(2), min:0, max:100 }
+        }
+      ]
+    };
+  }
+
+  function randSeq(n,min,max){ return Array.from({length:n},()=> +(Math.random()*(max-min)+min).toFixed(2)); }
+</script>
+</body>
+</html>
