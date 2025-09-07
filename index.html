@@ -8,16 +8,16 @@
   <link rel="preconnect" href="https://unpkg.com" />
   <style>
     :root { --bg:#0b1020; --panel:#111731; --muted:#8ea0c0; --text:#e9eefb; --accent:#4f7cff; --grid-gap:16px; }
-    *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji"}
+    *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--text);font:clamp(14px,1.05vw,16px)/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Apple Color Emoji","Segoe UI Emoji"}
     .topbar{position:sticky;top:0;z-index:10;backdrop-filter:blur(6px);background:linear-gradient(180deg,rgba(17,23,49,0.9),rgba(17,23,49,0.6));border-bottom:1px solid rgba(255,255,255,0.06)}
-    .container{max-width:1200px;margin:0 auto;padding:16px}
+    .container{width:min(1600px,96vw);max-width:1600px;margin:0 auto;padding:16px}
     .prompt{display:grid;grid-template-columns:1fr auto auto auto auto;gap:8px;align-items:center}
     .prompt input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:#0e152d;color:var(--text)}
     .btn{padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.08);background:#0f1731;color:var(--text);cursor:pointer;transition:120ms ease}
     .btn:hover{transform:translateY(-1px);border-color:rgba(79,124,255,0.35)} .btn.primary{background:linear-gradient(180deg,#4f7cff,#3c5fe0);border:none} .btn.ghost{background:transparent}
     .btn.badge{position:relative} .btn.badge .count{position:absolute;top:-6px;right:-6px;background:#ff6b6b;color:white;font-size:10px;padding:2px 6px;border-radius:999px}
     .status{color:var(--muted);font-size:12px;margin-top:8px;min-height:18px}
-    .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--grid-gap);padding:16px}
+    .dashboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:var(--grid-gap);padding:16px}
     .card{background:var(--panel);border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;min-height:260px}
     .card-header{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.06)} .card-title{font-weight:600}
     .card-sub{color:var(--muted);font-size:12px;margin-top:2px}
@@ -35,6 +35,7 @@
     .desc{color:var(--muted);font-size:12px}
     .item button{border:1px solid rgba(255,255,255,0.08);background:#142148;color:var(--text);border-radius:8px;padding:6px 8px;cursor:pointer}
     .item button:hover{border-color:rgba(79,124,255,0.35)} .drawer-footer{margin-top:auto;padding:10px 16px;border-top:1px solid rgba(255,255,255,0.08);color:var(--muted);font-size:12px}
+  @media (min-width: 1440px){.container{width:min(1800px,96vw);max-width:1800px}.dashboard{grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}}
   </style>
 </head>
 <body>
